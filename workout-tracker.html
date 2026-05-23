@@ -838,14 +838,9 @@ function updateProfileDisplay() {
   const gUser = loadGoogleUser();
   const el = document.getElementById('profileDisplay');
   const avatar = document.getElementById('headerAvatar');
-  if (gUser) {
-    el.textContent = gUser.name;
-    if (avatar && gUser.picture) { avatar.src = gUser.picture; avatar.style.display = 'block'; }
-    else if (avatar) avatar.style.display = 'none';
-  } else {
-    el.textContent = s.name || '';
-    if (avatar) avatar.style.display = 'none';
-  }
+  el.textContent = s.name || (gUser ? gUser.name : '');
+  if (gUser && gUser.picture) { avatar.src = gUser.picture; avatar.style.display = 'block'; }
+  else if (avatar) avatar.style.display = 'none';
 }
 
 // ===== GOOGLE SIGN-IN =====
@@ -886,6 +881,11 @@ function handleGoogleCredential(response) {
 function signOutGoogle() {
   const user = loadGoogleUser();
   saveGoogleUser(null);
+  const s = loadSettings();
+  s.name = '';
+  saveSettings(s);
+  const nameInput = document.getElementById('settingName');
+  if (nameInput) nameInput.value = '';
   updateProfileDisplay();
   updateGoogleSection();
   if (window.google && google.accounts && google.accounts.id) {
