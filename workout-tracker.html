@@ -863,7 +863,9 @@ function saveGoogleUser(user) {
 function decodeJwtPayload(token) {
   try {
     const b64 = token.split('.')[1].replace(/-/g,'+').replace(/_/g,'/');
-    return JSON.parse(atob(b64));
+    const binary = atob(b64);
+    const bytes = Uint8Array.from(binary, c => c.charCodeAt(0));
+    return JSON.parse(new TextDecoder().decode(bytes));
   } catch { return null; }
 }
 
@@ -877,12 +879,16 @@ function handleGoogleCredential(response) {
 }
 
 function signOutGoogle() {
-  if (window.google && google.accounts && google.accounts.id) {
-    google.accounts.id.disableAutoSelect();
-  }
+  const user = loadGoogleUser();
   saveGoogleUser(null);
   updateProfileDisplay();
   updateGoogleSection();
+  if (window.google && google.accounts && google.accounts.id) {
+    google.accounts.id.disableAutoSelect();
+    if (user && user.email) {
+      try { google.accounts.id.revoke(user.email, () => {}); } catch(e) {}
+    }
+  }
   showToast('サインアウトしました');
 }
 
