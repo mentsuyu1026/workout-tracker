@@ -1,0 +1,1694 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>筋トレ記録アプリ</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+  <style>
+    :root {
+      --bg: #0f0f13;
+      --surface: #1a1a24;
+      --surface2: #242435;
+      --border: #2e2e45;
+      --accent: #6c63ff;
+      --accent2: #ff6584;
+      --gold: #ffd700;
+      --green: #4ade80;
+      --text: #e8e8f0;
+      --muted: #6b6b8a;
+      --radius: 14px;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      min-height: 100vh;
+    }
+
+    /* ===== HEADER ===== */
+    header {
+      background: linear-gradient(135deg, var(--accent) 0%, #a855f7 100%);
+      padding: 20px 24px 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      box-shadow: 0 4px 24px rgba(108,99,255,0.4);
+    }
+    header h1 { font-size: 1.4rem; font-weight: 800; letter-spacing: 0.5px; }
+    header .streak {
+      background: rgba(255,255,255,0.2);
+      border-radius: 20px;
+      padding: 6px 14px;
+      font-size: 0.85rem;
+      font-weight: 700;
+    }
+
+    /* ===== NAV ===== */
+    nav {
+      display: flex;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+    }
+    nav button {
+      flex: 1;
+      padding: 14px 8px;
+      background: none;
+      border: none;
+      color: var(--muted);
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: color 0.2s, border-bottom 0.2s;
+      border-bottom: 3px solid transparent;
+    }
+    nav button.active {
+      color: var(--accent);
+      border-bottom-color: var(--accent);
+    }
+
+    /* ===== PAGES ===== */
+    .page { display: none; padding: 20px 16px 80px; max-width: 600px; margin: 0 auto; }
+    .page.active { display: block; }
+
+    /* ===== DATE SELECTOR ===== */
+    .date-bar {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 20px;
+    }
+    .date-bar button {
+      width: 36px; height: 36px;
+      flex-shrink: 0;
+      border-radius: 50%;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--text);
+      font-size: 1.1rem;
+      cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      position: relative;
+      z-index: 1;
+    }
+    .date-bar input[type=date] {
+      flex: 1;
+      min-width: 0;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      color: var(--text);
+      padding: 9px 14px;
+      font-size: 1rem;
+    }
+    .date-label {
+      font-size: 0.8rem;
+      color: var(--muted);
+      text-align: center;
+    }
+
+    /* ===== BODY WEIGHT CARD ===== */
+    .bw-card {
+      background: var(--surface);
+      border: 1px solid rgba(74,222,128,0.25);
+      border-radius: var(--radius);
+      padding: 14px 18px;
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+    .bw-label {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      font-size: 0.9rem;
+      font-weight: 600;
+      color: var(--text);
+      white-space: nowrap;
+    }
+    .bw-input-wrap {
+      display: flex;
+      align-items: baseline;
+      gap: 5px;
+      margin-left: auto;
+    }
+    .bw-input-wrap input {
+      width: 90px;
+      font-size: 1.5rem;
+      font-weight: 700;
+      text-align: right;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text);
+      padding: 4px 8px;
+    }
+    .bw-input-wrap input:focus { border-color: #4ade80; outline: none; box-shadow: 0 0 0 3px rgba(74,222,128,0.15); }
+    .bw-unit { font-size: 0.95rem; color: var(--muted); }
+    .bw-change { font-size: 0.8rem; font-weight: 600; white-space: nowrap; min-width: 90px; text-align: right; }
+
+    /* ===== SUMMARY CARDS ===== */
+    .summary-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 10px;
+      margin-bottom: 20px;
+    }
+    .summary-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 14px 10px;
+      text-align: center;
+    }
+    .summary-card .val {
+      font-size: 1.6rem;
+      font-weight: 800;
+      color: var(--accent);
+      line-height: 1;
+    }
+    .summary-card .lbl {
+      font-size: 0.7rem;
+      color: var(--muted);
+      margin-top: 4px;
+    }
+
+    /* ===== EXERCISE LIST ===== */
+    .section-title {
+      font-size: 0.8rem;
+      font-weight: 700;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: 10px;
+    }
+    .exercise-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      margin-bottom: 12px;
+      overflow: hidden;
+    }
+    .exercise-header {
+      display: flex;
+      align-items: center;
+      padding: 14px 16px;
+      gap: 10px;
+      cursor: pointer;
+    }
+    .exercise-header .ex-name {
+      flex: 1;
+      font-weight: 700;
+      font-size: 1rem;
+    }
+    .badge {
+      font-size: 0.7rem;
+      font-weight: 700;
+      padding: 3px 8px;
+      border-radius: 20px;
+    }
+    .badge-pr {
+      background: rgba(255,215,0,0.2);
+      color: var(--gold);
+      border: 1px solid rgba(255,215,0,0.4);
+    }
+    .badge-up {
+      background: rgba(74,222,128,0.15);
+      color: var(--green);
+      border: 1px solid rgba(74,222,128,0.3);
+    }
+    .exercise-sets {
+      padding: 0 16px 12px;
+    }
+    .sets-grid {
+      display: grid;
+      grid-template-columns: 40px 1fr 1fr 36px;
+      gap: 6px;
+      align-items: center;
+    }
+    .sets-header {
+      font-size: 0.7rem;
+      color: var(--muted);
+      font-weight: 600;
+      text-align: center;
+      padding: 4px 0;
+    }
+    .set-num {
+      width: 28px; height: 28px;
+      border-radius: 50%;
+      background: var(--surface2);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 0.75rem;
+      color: var(--muted);
+      font-weight: 700;
+      margin: auto;
+    }
+    .sets-grid input {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text);
+      padding: 7px 6px;
+      text-align: center;
+      font-size: 0.95rem;
+      width: 100%;
+    }
+    .sets-grid input:focus { outline: none; border-color: var(--accent); }
+    .del-set {
+      width: 28px; height: 28px;
+      border-radius: 50%;
+      background: rgba(255,101,132,0.1);
+      border: none;
+      color: var(--accent2);
+      cursor: pointer;
+      font-size: 1rem;
+      display: flex; align-items: center; justify-content: center;
+      margin: auto;
+    }
+    .add-set-btn {
+      margin-top: 8px;
+      width: 100%;
+      background: rgba(108,99,255,0.1);
+      border: 1px dashed rgba(108,99,255,0.4);
+      border-radius: 8px;
+      color: var(--accent);
+      padding: 8px;
+      font-size: 0.85rem;
+      cursor: pointer;
+      font-weight: 600;
+    }
+    .prev-best {
+      margin-top: 8px;
+      font-size: 0.75rem;
+      color: var(--muted);
+      background: var(--surface2);
+      border-radius: 8px;
+      padding: 6px 10px;
+    }
+    .prev-best span { color: var(--text); font-weight: 700; }
+
+    /* ===== ADD EXERCISE ===== */
+    .add-exercise-area {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 16px;
+      margin-bottom: 12px;
+    }
+    .add-exercise-area input, .add-exercise-area select {
+      width: 100%;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text);
+      padding: 10px 14px;
+      font-size: 0.95rem;
+      margin-bottom: 8px;
+    }
+    .add-exercise-area input::placeholder { color: var(--muted); }
+    .presets {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-bottom: 10px;
+    }
+    .preset-btn {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      color: var(--text);
+      padding: 5px 12px;
+      font-size: 0.8rem;
+      cursor: pointer;
+    }
+    .preset-btn:hover { border-color: var(--accent); color: var(--accent); }
+    .primary-btn {
+      width: 100%;
+      background: linear-gradient(135deg, var(--accent), #a855f7);
+      border: none;
+      border-radius: 10px;
+      color: #fff;
+      padding: 12px;
+      font-size: 1rem;
+      font-weight: 700;
+      cursor: pointer;
+      box-shadow: 0 4px 16px rgba(108,99,255,0.4);
+    }
+    .primary-btn:hover { opacity: 0.9; }
+
+    /* ===== PROGRESS PAGE ===== */
+    .filter-row {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 16px;
+      flex-wrap: wrap;
+    }
+    .filter-row select, .filter-row input {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      color: var(--text);
+      padding: 9px 12px;
+      font-size: 0.9rem;
+      flex: 1;
+      min-width: 140px;
+    }
+    .chart-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 16px;
+      margin-bottom: 16px;
+    }
+    .chart-card h3 { font-size: 1rem; margin-bottom: 4px; }
+    .chart-card .chart-sub { font-size: 0.8rem; color: var(--muted); margin-bottom: 14px; }
+    .pr-banner {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      background: rgba(255,215,0,0.08);
+      border: 1px solid rgba(255,215,0,0.25);
+      border-radius: 10px;
+      padding: 10px 14px;
+      margin-bottom: 10px;
+      font-size: 0.85rem;
+    }
+    .pr-banner .pr-icon { font-size: 1.4rem; }
+    .pr-banner strong { color: var(--gold); }
+
+    /* ===== HISTORY PAGE ===== */
+    .calendar-grid {
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      gap: 4px;
+      margin-bottom: 20px;
+    }
+    .cal-day-name {
+      text-align: center;
+      font-size: 0.7rem;
+      color: var(--muted);
+      font-weight: 700;
+      padding: 4px 0;
+    }
+    .cal-day {
+      aspect-ratio: 1;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.75rem;
+      cursor: pointer;
+      background: var(--surface);
+      border: 1px solid transparent;
+      position: relative;
+      transition: border-color 0.15s;
+    }
+    .cal-day.has-workout {
+      background: rgba(108,99,255,0.2);
+      border-color: rgba(108,99,255,0.5);
+      font-weight: 700;
+      color: var(--accent);
+    }
+    .cal-day.today { border-color: var(--accent2); }
+    .cal-day.selected { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(108,99,255,0.4); }
+    .cal-day.empty { background: transparent; border-color: transparent; cursor: default; }
+    .cal-dot {
+      position: absolute;
+      bottom: 3px;
+      width: 4px; height: 4px;
+      border-radius: 50%;
+      background: var(--gold);
+    }
+    .cal-nav {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 12px;
+    }
+    .cal-nav button {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text);
+      padding: 6px 14px;
+      cursor: pointer;
+      font-size: 1rem;
+    }
+    .cal-nav span { font-weight: 700; font-size: 1rem; }
+    .history-entry {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 14px 16px;
+      margin-bottom: 10px;
+    }
+    .history-entry .he-date {
+      font-size: 0.8rem;
+      color: var(--muted);
+      margin-bottom: 6px;
+    }
+    .history-entry .he-exercises {
+      font-size: 0.9rem;
+      line-height: 1.6;
+    }
+    .he-ex-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .he-ex-row .he-name { font-weight: 600; }
+    .he-ex-row .he-best {
+      font-size: 0.8rem;
+      color: var(--muted);
+    }
+
+    /* ===== EMPTY STATE ===== */
+    .empty-state {
+      text-align: center;
+      padding: 40px 20px;
+      color: var(--muted);
+    }
+    .empty-state .ei { margin-bottom: 16px; display: flex; justify-content: center; }
+    .empty-state p { font-size: 0.9rem; line-height: 1.6; }
+
+    /* ===== TOAST ===== */
+    #toast {
+      position: fixed;
+      bottom: 24px;
+      left: 50%;
+      transform: translateX(-50%) translateY(20px);
+      background: var(--accent);
+      color: #fff;
+      padding: 12px 24px;
+      border-radius: 30px;
+      font-weight: 700;
+      font-size: 0.9rem;
+      opacity: 0;
+      transition: all 0.3s;
+      pointer-events: none;
+      z-index: 999;
+      white-space: nowrap;
+      box-shadow: 0 4px 20px rgba(108,99,255,0.5);
+    }
+    #toast.show {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+    }
+
+    /* ===== SCROLL STYLE ===== */
+    ::-webkit-scrollbar { width: 4px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+
+    /* ===== HEADER LAYOUT ===== */
+    .header-right { display: flex; align-items: center; gap: 8px; }
+    .profile-sub { font-size: 1rem; font-weight: 600; margin-top: 2px; min-height: 1em; }
+    .profile-name-row { display: flex; align-items: center; gap: 8px; margin-top: 2px; }
+    .header-avatar { width: 28px; height: 28px; border-radius: 50%; border: 2px solid rgba(255,255,255,0.35); object-fit: cover; display: none; }
+    /* ===== GOOGLE SIGN-IN ===== */
+    .google-user-row { display: flex; align-items: center; gap: 10px; background: var(--surface2); border-radius: 10px; padding: 10px 12px; }
+    .google-avatar { width: 40px; height: 40px; border-radius: 50%; flex-shrink: 0; }
+    .google-signout-btn { margin-left: auto; flex-shrink: 0; background: transparent; border: 1px solid var(--border); color: var(--muted); border-radius: 8px; padding: 6px 12px; font-size: 0.8rem; cursor: pointer; }
+    .google-signout-btn:hover { border-color: var(--accent2); color: var(--accent2); }
+    .freq-badge {
+      background: rgba(255,255,255,0.15);
+      border: 1px solid rgba(255,255,255,0.3);
+      border-radius: 20px;
+      padding: 5px 12px;
+      font-size: 0.78rem;
+      font-weight: 700;
+      white-space: nowrap;
+      display: none;
+    }
+    .settings-btn {
+      width: 34px; height: 34px;
+      border-radius: 50%;
+      background: rgba(255,255,255,0.15);
+      border: 1px solid rgba(255,255,255,0.3);
+      color: #fff;
+      font-size: 1.1rem;
+      cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      transition: background 0.2s;
+    }
+    .settings-btn:hover { background: rgba(255,255,255,0.25); }
+
+    /* ===== EXERCISE CARD ACTIONS ===== */
+    .edit-name-btn {
+      background: none; border: none;
+      color: rgba(255,255,255,0.5);
+      cursor: pointer; font-size: 0.85rem;
+      padding: 0 4px;
+      transition: color 0.15s;
+      flex-shrink: 0;
+    }
+    .edit-name-btn:hover { color: var(--accent); }
+    .del-ex-btn {
+      width: 28px; height: 28px;
+      border-radius: 50%;
+      background: rgba(255,101,132,0.12);
+      border: 1px solid rgba(255,101,132,0.3);
+      color: var(--accent2);
+      cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0;
+      padding: 0;
+    }
+    .del-ex-btn:hover { background: rgba(255,101,132,0.3); }
+    .ex-name-input {
+      flex: 1; min-width: 0;
+      background: var(--surface2);
+      border: 1px solid var(--accent);
+      border-radius: 6px;
+      color: var(--text);
+      padding: 3px 8px;
+      font-size: 1rem;
+      font-weight: 700;
+    }
+
+    /* ===== SETTINGS MODAL ===== */
+    .modal-overlay {
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,0.65);
+      z-index: 200;
+      display: flex; align-items: flex-end;
+      animation: fadeIn 0.15s;
+    }
+    @keyframes fadeIn { from { opacity:0 } to { opacity:1 } }
+    .modal-sheet {
+      background: var(--surface);
+      width: 100%; max-width: 600px;
+      margin: 0 auto;
+      border-radius: 20px 20px 0 0;
+      padding: 8px 20px 40px;
+      max-height: 85vh;
+      overflow-y: auto;
+    }
+    .modal-handle {
+      width: 40px; height: 4px;
+      background: var(--border);
+      border-radius: 2px;
+      margin: 10px auto 18px;
+    }
+    .modal-sheet h2 { font-size: 1.1rem; margin-bottom: 18px; }
+    .modal-section {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 16px;
+      margin-bottom: 14px;
+    }
+    .modal-section h3 {
+      font-size: 0.75rem;
+      color: var(--muted);
+      letter-spacing: 1px;
+      margin-bottom: 12px;
+    }
+    .modal-section input[type=text] {
+      width: 100%;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text);
+      padding: 10px 14px;
+      font-size: 0.95rem;
+      margin-bottom: 10px;
+    }
+    .emoji-row {
+      display: flex; gap: 8px; flex-wrap: wrap;
+    }
+    .emoji-opt {
+      width: 40px; height: 40px;
+      border-radius: 10px;
+      border: 2px solid var(--border);
+      background: var(--surface);
+      font-size: 1.3rem;
+      cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      transition: border-color 0.15s;
+    }
+    .emoji-opt.selected { border-color: var(--accent); background: rgba(108,99,255,0.15); }
+    .freq-row {
+      display: flex; gap: 8px; flex-wrap: wrap;
+    }
+    .freq-opt {
+      flex: 1; min-width: 44px;
+      padding: 10px 4px;
+      border-radius: 10px;
+      border: 2px solid var(--border);
+      background: var(--surface);
+      color: var(--text);
+      font-size: 0.9rem;
+      font-weight: 700;
+      cursor: pointer;
+      text-align: center;
+      transition: border-color 0.15s;
+    }
+    .freq-opt.selected { border-color: var(--accent); background: rgba(108,99,255,0.15); color: var(--accent); }
+    .modal-save-btn {
+      width: 100%;
+      background: linear-gradient(135deg, var(--accent), #a855f7);
+      border: none; border-radius: 10px;
+      color: #fff; padding: 13px;
+      font-size: 1rem; font-weight: 700;
+      cursor: pointer;
+      box-shadow: 0 4px 16px rgba(108,99,255,0.4);
+      margin-top: 4px;
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="rgba(255,255,255,0.92)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-4px;margin-right:5px"><rect x="0.5" y="7.5" width="4" height="9" rx="1.2" fill="rgba(255,255,255,0.22)" stroke-width="2.2"/><line x1="5.5" y1="9.5" x2="5.5" y2="14.5" stroke-width="2.5"/><line x1="5.5" y1="12" x2="18.5" y2="12" stroke-width="1.8"/><line x1="18.5" y1="9.5" x2="18.5" y2="14.5" stroke-width="2.5"/><rect x="19.5" y="7.5" width="4" height="9" rx="1.2" fill="rgba(255,255,255,0.22)" stroke-width="2.2"/></svg>筋トレ記録</h1>
+    <div class="profile-name-row">
+      <img id="headerAvatar" class="header-avatar" alt="">
+      <div class="profile-sub" id="profileDisplay"></div>
+    </div>
+  </div>
+  <div class="header-right">
+    <div class="freq-badge" id="freqDisplay"></div>
+    <div class="streak" id="streakDisplay"></div>
+    <button class="settings-btn" onclick="openSettings()" title="設定"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="rgba(255,255,255,0.92)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></button>
+  </div>
+</header>
+
+<nav>
+  <button class="active" onclick="showPage('log')">記録</button>
+  <button onclick="showPage('progress')">進捗</button>
+  <button onclick="showPage('history')">履歴</button>
+</nav>
+
+<!-- ===== LOG PAGE ===== -->
+<div id="page-log" class="page active">
+  <div class="date-bar">
+    <button onclick="changeDate(-1)">‹</button>
+    <input type="date" id="logDate" onchange="loadLogPage()">
+    <button onclick="changeDate(1)">›</button>
+  </div>
+
+  <div class="summary-row">
+    <div class="summary-card">
+      <div class="val" id="sumVolume">0</div>
+      <div class="lbl">総ボリューム (kg)</div>
+    </div>
+    <div class="summary-card">
+      <div class="val" id="sumSets">0</div>
+      <div class="lbl">セット数</div>
+    </div>
+    <div class="summary-card">
+      <div class="val" id="sumPR">0</div>
+      <div class="lbl"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="#ffd700" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:3px"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/><path d="M18 2H6v7a6 6 0 0 0 12 0V2z" fill="rgba(255,215,0,0.18)"/></svg>自己ベスト更新</div>
+    </div>
+  </div>
+
+  <div class="bw-card">
+    <div class="bw-label">
+      体重
+    </div>
+    <div class="bw-input-wrap">
+      <input type="number" id="bwInput" step="0.1" min="20" max="300" placeholder="--" onfocus="this.select()" oninput="saveBodyWeightToday(this.value)">
+      <span class="bw-unit">kg</span>
+    </div>
+    <div class="bw-change" id="bwChange"></div>
+  </div>
+
+  <div class="section-title">今日の種目</div>
+  <div id="exerciseList"></div>
+
+  <div class="section-title" style="margin-top:20px">種目を追加</div>
+  <div class="add-exercise-area">
+    <div class="presets" id="presetButtons"></div>
+    <input type="text" id="newExName" placeholder="種目名を入力 (例: ベンチプレス)">
+    <button class="primary-btn" onclick="addExercise()">＋ 追加</button>
+  </div>
+</div>
+
+<!-- ===== PROGRESS PAGE ===== -->
+<div id="page-progress" class="page">
+  <div class="filter-row">
+    <select id="progressEx" onchange="renderProgress()">
+      <option value="">種目を選択</option>
+    </select>
+    <select id="progressRange" onchange="renderProgress()">
+      <option value="30">過去30日</option>
+      <option value="90">過去90日</option>
+      <option value="180">過去180日</option>
+      <option value="365">1年</option>
+      <option value="all">全期間</option>
+    </select>
+  </div>
+  <div id="progressContent"></div>
+</div>
+
+<!-- ===== HISTORY PAGE ===== -->
+<div id="page-history" class="page">
+  <div class="cal-nav">
+    <button onclick="changeCalMonth(-1)">‹</button>
+    <span id="calTitle"></span>
+    <button onclick="changeCalMonth(1)">›</button>
+  </div>
+  <div class="calendar-grid" id="calGrid"></div>
+  <div class="section-title" id="historyDetailTitle">記録一覧</div>
+  <div id="historyDetail"></div>
+</div>
+
+<div id="toast"></div>
+
+<!-- ===== SETTINGS MODAL ===== -->
+<div id="settingsModal" class="modal-overlay" style="display:none" onclick="if(event.target===this)closeSettings()">
+  <div class="modal-sheet">
+    <div class="modal-handle"></div>
+    <h2>⚙ 設定</h2>
+
+    <div class="modal-section">
+      <h3>プロフィール</h3>
+      <input type="text" id="settingName" placeholder="名前を入力">
+    </div>
+
+    <div class="modal-section">
+      <h3>ジムの頻度</h3>
+      <p style="font-size:0.85rem;color:var(--muted);margin-bottom:12px">何日に1回ジムに行きますか？</p>
+      <div class="freq-row" id="freqRow"></div>
+    </div>
+
+    <div class="modal-section">
+      <h3>Googleアカウント</h3>
+      <div id="googleSignInArea"></div>
+    </div>
+
+    <button class="modal-save-btn" onclick="saveAndCloseSettings()">保存する</button>
+  </div>
+</div>
+
+<script>
+// ===== GOOGLE OAUTH =====
+const GOOGLE_CLIENT_ID = '735269920297-cbtd7o6ifes129a45i5k18cllb9plpmc.apps.googleusercontent.com';
+
+// ===== SETTINGS =====
+const SETTINGS_KEY = 'workoutSettings_v1';
+
+function loadSettings() {
+  try { return JSON.parse(localStorage.getItem(SETTINGS_KEY)) || {}; }
+  catch { return {}; }
+}
+function saveSettings(s) { localStorage.setItem(SETTINGS_KEY, JSON.stringify(s)); }
+
+function openSettings() {
+  const s = loadSettings();
+  document.getElementById('settingName').value = s.name || '';
+
+  // Frequency options
+  const fr = document.getElementById('freqRow');
+  fr.innerHTML = [1,2,3,4,5,6,7].map(n =>
+    `<button class="freq-opt${(s.gymFrequency||0)===n?' selected':''}" onclick="selectFreq(this,${n})">${n}日</button>`
+  ).join('');
+
+  document.getElementById('settingsModal').style.display = 'flex';
+  updateGoogleSection();
+}
+
+function closeSettings() {
+  document.getElementById('settingsModal').style.display = 'none';
+}
+
+function selectFreq(btn, n) {
+  document.querySelectorAll('.freq-opt').forEach(b => b.classList.remove('selected'));
+  btn.classList.add('selected');
+}
+
+function saveAndCloseSettings() {
+  const s = loadSettings();
+  s.name = document.getElementById('settingName').value.trim();
+  const selFreq = document.querySelector('.freq-opt.selected');
+  s.gymFrequency = selFreq ? parseInt(selFreq.textContent) : 0;
+  saveSettings(s);
+  closeSettings();
+  updateProfileDisplay();
+  updateStreak();
+  showToast('設定を保存しました');
+}
+
+function updateProfileDisplay() {
+  const s = loadSettings();
+  const gUser = loadGoogleUser();
+  const el = document.getElementById('profileDisplay');
+  const avatar = document.getElementById('headerAvatar');
+  if (gUser) {
+    el.textContent = gUser.name;
+    if (avatar && gUser.picture) { avatar.src = gUser.picture; avatar.style.display = 'block'; }
+    else if (avatar) avatar.style.display = 'none';
+  } else {
+    el.textContent = s.name || '';
+    if (avatar) avatar.style.display = 'none';
+  }
+}
+
+// ===== GOOGLE SIGN-IN =====
+const GOOGLE_USER_KEY = 'workoutGoogleUser_v1';
+
+function loadGoogleUser() {
+  try { return JSON.parse(localStorage.getItem(GOOGLE_USER_KEY)) || null; }
+  catch { return null; }
+}
+function saveGoogleUser(user) {
+  if (user) localStorage.setItem(GOOGLE_USER_KEY, JSON.stringify(user));
+  else localStorage.removeItem(GOOGLE_USER_KEY);
+}
+
+function decodeJwtPayload(token) {
+  try {
+    const b64 = token.split('.')[1].replace(/-/g,'+').replace(/_/g,'/');
+    return JSON.parse(atob(b64));
+  } catch { return null; }
+}
+
+function handleGoogleCredential(response) {
+  const payload = decodeJwtPayload(response.credential);
+  if (!payload) { showToast('サインインに失敗しました'); return; }
+  saveGoogleUser({ name: payload.name, email: payload.email, picture: payload.picture });
+  updateProfileDisplay();
+  updateGoogleSection();
+  showToast('Googleアカウントでサインインしました');
+}
+
+function signOutGoogle() {
+  if (window.google && google.accounts && google.accounts.id) {
+    google.accounts.id.disableAutoSelect();
+  }
+  saveGoogleUser(null);
+  updateProfileDisplay();
+  updateGoogleSection();
+  showToast('サインアウトしました');
+}
+
+function updateGoogleSection() {
+  const area = document.getElementById('googleSignInArea');
+  if (!area) return;
+  const user = loadGoogleUser();
+  if (user) {
+    area.innerHTML = `
+      <div class="google-user-row">
+        ${user.picture ? `<img class="google-avatar" src="${user.picture}" onerror="this.style.display='none'" alt="">` : ''}
+        <div style="flex:1;min-width:0">
+          <div style="font-weight:600;font-size:0.9rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${user.name}</div>
+          <div style="font-size:0.75rem;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${user.email}</div>
+        </div>
+        <button class="google-signout-btn" onclick="signOutGoogle()">サインアウト</button>
+      </div>`;
+    return;
+  }
+  area.innerHTML = `<div id="googleBtnWrap" style="min-height:44px"></div>`;
+  if (window.google && google.accounts && google.accounts.id) {
+    try {
+      google.accounts.id.initialize({ client_id: GOOGLE_CLIENT_ID, callback: handleGoogleCredential, auto_select: false });
+      google.accounts.id.renderButton(document.getElementById('googleBtnWrap'), { theme: 'filled_black', size: 'large', locale: 'ja' });
+    } catch(e) {
+      document.getElementById('googleBtnWrap').innerHTML = `<p style="font-size:0.8rem;color:var(--accent2)">サインインボタンを読み込めませんでした</p>`;
+    }
+  } else {
+    document.getElementById('googleBtnWrap').innerHTML = `<p style="font-size:0.8rem;color:var(--muted)">Googleライブラリを読み込み中...</p>`;
+  }
+}
+
+// ===== DATA LAYER =====
+const DB_KEY = 'workoutDB_v2';
+
+function loadDB() {
+  try { return JSON.parse(localStorage.getItem(DB_KEY)) || {}; }
+  catch { return {}; }
+}
+function saveDB(db) {
+  localStorage.setItem(DB_KEY, JSON.stringify(db));
+}
+
+function getWorkout(dateStr) {
+  const db = loadDB();
+  return db[dateStr] || { exercises: [] };
+}
+function saveWorkout(dateStr, workout) {
+  const db = loadDB();
+  db[dateStr] = workout;
+  saveDB(db);
+}
+
+function getPR(exName) {
+  const db = loadDB();
+  let best = 0;
+  for (const date in db) {
+    const wo = db[date];
+    if (!wo.exercises) continue;
+    const ex = wo.exercises.find(e => e.name === exName);
+    if (ex) {
+      ex.sets.forEach(s => {
+        const w = parseFloat(s.weight) || 0;
+        if (w > best) best = w;
+      });
+    }
+  }
+  return best;
+}
+
+function getPRBeforeDate(exName, dateStr) {
+  const db = loadDB();
+  let best = 0;
+  for (const date in db) {
+    if (date >= dateStr) continue;
+    const wo = db[date];
+    if (!wo.exercises) continue;
+    const ex = wo.exercises.find(e => e.name === exName);
+    if (ex) {
+      ex.sets.forEach(s => {
+        const w = parseFloat(s.weight) || 0;
+        if (w > best) best = w;
+      });
+    }
+  }
+  return best;
+}
+
+function getMaxWeightForDate(exName, dateStr) {
+  const wo = getWorkout(dateStr);
+  const ex = wo.exercises.find(e => e.name === exName);
+  if (!ex || !ex.sets.length) return 0;
+  return Math.max(...ex.sets.map(s => parseFloat(s.weight) || 0));
+}
+
+function getAllExerciseNames() {
+  const db = loadDB();
+  const names = new Set();
+  for (const date in db) {
+    const wo = db[date];
+    if (wo.exercises) wo.exercises.forEach(e => names.add(e.name));
+  }
+  return [...names].sort();
+}
+
+function getAllDatesWithWorkout() {
+  const db = loadDB();
+  return Object.keys(db).filter(d => {
+    const wo = db[d];
+    return wo.exercises && wo.exercises.some(e => e.sets && e.sets.length > 0);
+  });
+}
+
+// ===== ICONS =====
+const TRASH_SVG = `<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>`;
+const EDIT_SVG = `<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>`;
+// Barbell: for streak / title (plate + collar + long bar)
+const DUMBBELL_SVG = `<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px"><rect x="0.5" y="7.5" width="4" height="9" rx="1.2" fill="rgba(255,255,255,0.22)" stroke-width="2.2"/><line x1="5.5" y1="9.5" x2="5.5" y2="14.5" stroke-width="2.5"/><line x1="5.5" y1="12" x2="18.5" y2="12" stroke-width="1.8"/><line x1="18.5" y1="9.5" x2="18.5" y2="14.5" stroke-width="2.5"/><rect x="19.5" y="7.5" width="4" height="9" rx="1.2" fill="rgba(255,255,255,0.22)" stroke-width="2.2"/></svg>`;
+// Trophy: gold, 13×13 for badges / 18×18 for banner
+const TROPHY_SVG = `<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="#ffd700" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/><path d="M18 2H6v7a6 6 0 0 0 12 0V2z" fill="rgba(255,215,0,0.18)"/></svg>`;
+const TROPHY_SVG_MD = `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="#ffd700" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:3px"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/><path d="M18 2H6v7a6 6 0 0 0 12 0V2z" fill="rgba(255,215,0,0.18)"/></svg>`;
+// Weightlifter: person=purple, bar=silver, plates=purple with fill
+const LIFTER_SVG = `<svg viewBox="0 0 100 100" width="82" height="82" fill="none" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="18" x2="88" y2="18" stroke="#9090bb" stroke-width="3.5"/><rect x="3" y="9" width="9" height="18" rx="2.5" stroke="#6c63ff" fill="rgba(108,99,255,0.4)" stroke-width="2.5"/><line x1="14" y1="10" x2="14" y2="26" stroke="#9090bb" stroke-width="3.5"/><line x1="86" y1="10" x2="86" y2="26" stroke="#9090bb" stroke-width="3.5"/><rect x="88" y="9" width="9" height="18" rx="2.5" stroke="#6c63ff" fill="rgba(108,99,255,0.4)" stroke-width="2.5"/><circle cx="50" cy="35" r="11" stroke="#6c63ff" fill="rgba(108,99,255,0.28)" stroke-width="3"/><line x1="50" y1="46" x2="50" y2="70" stroke="#6c63ff" stroke-width="7"/><polyline points="43,52 27,40 27,18" stroke="#6c63ff" stroke-width="5.5"/><polyline points="57,52 73,40 73,18" stroke="#6c63ff" stroke-width="5.5"/><line x1="50" y1="70" x2="36" y2="93" stroke="#6c63ff" stroke-width="5.5"/><line x1="50" y1="70" x2="64" y2="93" stroke="#6c63ff" stroke-width="5.5"/><line x1="36" y1="93" x2="24" y2="93" stroke="#6c63ff" stroke-width="5"/><line x1="64" y1="93" x2="76" y2="93" stroke="#6c63ff" stroke-width="5"/></svg>`;
+
+// ===== PRESETS =====
+const PRESETS = [
+  'ベンチプレス','スクワット','デッドリフト','ショルダープレス',
+  'ラットプルダウン','ダンベルカール','トライセプスプレス','レッグプレス',
+  'ベントオーバーロウ','チェストフライ'
+];
+
+// ===== STATE =====
+let currentDate = todayStr();
+let calYear, calMonth;
+let chartInstance = null;
+
+function localDateStr(d) {
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+function todayStr() {
+  return localDateStr(new Date());
+}
+function formatDate(dateStr) {
+  const d = new Date(dateStr + 'T00:00:00');
+  return `${d.getFullYear()}年${d.getMonth()+1}月${d.getDate()}日`;
+}
+
+// ===== NAV =====
+function showPage(name) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('nav button').forEach(b => b.classList.remove('active'));
+  document.getElementById('page-' + name).classList.add('active');
+  event.currentTarget.classList.add('active');
+  if (name === 'progress') renderProgressExSelect(), renderProgress();
+  if (name === 'history') renderCalendar(), renderHistoryDetail(null);
+  if (name === 'log') loadLogPage();
+}
+
+// ===== DATE BAR =====
+function changeDate(delta) {
+  const d = new Date(currentDate + 'T00:00:00');
+  d.setDate(d.getDate() + delta);
+  currentDate = localDateStr(d);
+  const input = document.getElementById('logDate');
+  input.value = currentDate;
+  input.blur();
+  loadLogPage();
+}
+
+// ===== LOG PAGE =====
+function loadLogPage() {
+  currentDate = document.getElementById('logDate').value || todayStr();
+  document.getElementById('logDate').value = currentDate;
+  renderExerciseList();
+  renderSummary();
+  renderPresets();
+  renderBodyWeightCard();
+  updateStreak();
+}
+
+// ===== BODY WEIGHT =====
+function saveBodyWeightToday(val) {
+  const wo = getWorkout(currentDate);
+  const num = parseFloat(val);
+  if (!isNaN(num) && num > 0) wo.bodyWeight = num;
+  else delete wo.bodyWeight;
+  saveWorkout(currentDate, wo);
+  updateBwChange();
+  renderProgressExSelect();
+}
+
+function renderBodyWeightCard() {
+  const wo = getWorkout(currentDate);
+  const input = document.getElementById('bwInput');
+  if (input) input.value = wo.bodyWeight || '';
+  updateBwChange();
+}
+
+function updateBwChange() {
+  const el = document.getElementById('bwChange');
+  if (!el) return;
+  const wo = getWorkout(currentDate);
+  const cur = wo.bodyWeight;
+  if (!cur) { el.textContent = ''; return; }
+  const db = loadDB();
+  const prev = Object.keys(db)
+    .filter(d => d < currentDate && db[d].bodyWeight > 0)
+    .sort().reverse()[0];
+  if (!prev) { el.textContent = '初回記録'; el.style.color = 'var(--green)'; return; }
+  const diff = (cur - db[prev].bodyWeight).toFixed(1);
+  const sign = diff > 0 ? '+' : '';
+  el.textContent = `前回比 ${sign}${diff}kg`;
+  el.style.color = diff > 0 ? 'var(--accent2)' : 'var(--green)';
+}
+
+function renderBodyWeightProgress(range, container) {
+  const db = loadDB();
+  const cutoff = range === 'all' ? null : localDateStr(new Date(new Date().setDate(new Date().getDate() - parseInt(range))));
+  const points = [];
+  for (const date in db) {
+    if (cutoff && date < cutoff) continue;
+    const wo = db[date];
+    if (wo.bodyWeight > 0) points.push({ date, w: wo.bodyWeight });
+  }
+  points.sort((a, b) => a.date.localeCompare(b.date));
+
+  if (!points.length) {
+    container.innerHTML = `<div class="empty-state"><p>この期間の体重記録がありません。<br>「記録」タブで体重を入力してください。</p></div>`;
+    return;
+  }
+
+  const latest = points[points.length - 1];
+  const totalDiff = (latest.w - points[0].w).toFixed(1);
+  const sign = totalDiff > 0 ? '+' : '';
+  const diffColor = totalDiff > 0 ? 'var(--accent2)' : 'var(--green)';
+
+  const bannerHTML = `<div class="pr-banner" style="border-color:rgba(74,222,128,0.3);background:rgba(74,222,128,0.08)">
+    <div>最新: <strong style="color:#4ade80">${latest.w}kg</strong>${points.length > 1 ? ` &nbsp;|&nbsp; 期間変化: <strong style="color:${diffColor}">${sign}${totalDiff}kg</strong>` : ''}</div>
+  </div>`;
+
+  container.innerHTML = `${bannerHTML}
+    <div class="chart-card">
+      <h3>体重の推移</h3>
+      <div class="chart-sub">${points.length}回の記録</div>
+      <canvas id="bwChart" height="200"></canvas>
+    </div>`;
+
+  if (chartInstance) { chartInstance.destroy(); chartInstance = null; }
+
+  const labels = points.map(p => { const d = new Date(p.date + 'T00:00:00'); return `${d.getMonth()+1}/${d.getDate()}`; });
+  const weights = points.map(p => p.w);
+  const dataMin = Math.min(...weights), dataMax = Math.max(...weights);
+  const pad = Math.max((dataMax - dataMin) * 0.5, 1.5);
+  const yMin = Math.max(0, Math.floor((dataMin - pad) * 2) / 2);
+  const yMax = Math.ceil((dataMax + pad) * 2) / 2;
+
+  chartInstance = new Chart(document.getElementById('bwChart').getContext('2d'), {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [{
+        label: '体重 (kg)',
+        data: weights,
+        borderColor: '#4ade80',
+        backgroundColor: 'rgba(74,222,128,0.1)',
+        borderWidth: 2.5,
+        pointRadius: 5,
+        pointBackgroundColor: '#4ade80',
+        tension: 0.35,
+        fill: true,
+      }]
+    },
+    options: {
+      responsive: true,
+      plugins: {
+        legend: { display: false },
+        tooltip: { callbacks: { label: ctx => `${ctx.parsed.y}kg` } }
+      },
+      scales: {
+        x: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#6b6b8a' } },
+        y: { min: yMin, max: yMax, grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#6b6b8a', callback: v => v + 'kg' } }
+      }
+    }
+  });
+}
+
+function renderPresets() {
+  const container = document.getElementById('presetButtons');
+  container.innerHTML = PRESETS.map(p =>
+    `<button class="preset-btn" onclick="addExerciseByName('${p}')">${p}</button>`
+  ).join('');
+}
+
+function renderExerciseList() {
+  const workout = getWorkout(currentDate);
+  const container = document.getElementById('exerciseList');
+  if (!workout.exercises.length) {
+    container.innerHTML = `<div class="empty-state"><div class="ei">${LIFTER_SVG}</div><p>まだ種目がありません。<br>下から種目を追加してください。</p></div>`;
+    return;
+  }
+  container.innerHTML = workout.exercises.map((ex, ei) => renderExerciseCard(ex, ei)).join('');
+}
+
+function renderExerciseCard(ex, ei) {
+  const prevBest = getPRBeforeDate(ex.name, currentDate);
+  const curMax = Math.max(0, ...ex.sets.map(s => parseFloat(s.weight) || 0));
+  const globalPR = getPR(ex.name);
+  const isPR = curMax > 0 && curMax >= globalPR && curMax > prevBest;
+  const isUp = curMax > 0 && prevBest > 0 && curMax > prevBest && !isPR;
+  const diff = prevBest > 0 ? ((curMax - prevBest) / prevBest * 100).toFixed(1) : null;
+
+  const badge = isPR
+    ? `<span class="badge badge-pr">${TROPHY_SVG} 自己ベスト更新!</span>`
+    : isUp
+    ? `<span class="badge badge-up">↑${diff !== null ? ' ' + diff + '%' : ''}</span>`
+    : '';
+
+  const setsHTML = ex.sets.map((s, si) => `
+    <div class="set-num">${si+1}</div>
+    <input type="number" step="0.5" value="${s.weight || ''}" placeholder="kg"
+      onfocus="this.select()"
+      onchange="updateSet(${ei},${si},'weight',this.value)" oninput="updateSet(${ei},${si},'weight',this.value)">
+    <input type="number" value="${s.reps || ''}" placeholder="回"
+      onfocus="this.select()"
+      onchange="updateSet(${ei},${si},'reps',this.value)" oninput="updateSet(${ei},${si},'reps',this.value)">
+    <button class="del-set" onclick="deleteSet(${ei},${si})">×</button>
+  `).join('');
+
+
+  return `
+    <div class="exercise-card">
+      <div class="exercise-header" onclick="toggleSets(this)">
+        <span class="ex-name">${ex.name}</span>
+        <button class="edit-name-btn" title="名称を変更" onclick="event.stopPropagation();startEditName(${ei})">${EDIT_SVG}</button>
+        ${badge}
+        <button class="del-ex-btn" title="削除" onclick="event.stopPropagation();deleteExercise(${ei})">${TRASH_SVG}</button>
+        <span class="toggle-arrow" style="color:var(--muted);font-size:0.9rem;margin-left:2px">▾</span>
+      </div>
+      <div class="exercise-sets">
+        <div class="sets-grid">
+          <div class="sets-header">#</div>
+          <div class="sets-header">重量 (kg)</div>
+          <div class="sets-header">回数</div>
+          <div></div>
+          ${setsHTML}
+        </div>
+        <button class="add-set-btn" onclick="addSet(${ei})">＋ セットを追加</button>
+      </div>
+    </div>`;
+}
+
+function toggleSets(header) {
+  const sets = header.nextElementSibling;
+  const collapsed = sets.style.display === 'none';
+  sets.style.display = collapsed ? '' : 'none';
+  header.querySelector('.toggle-arrow').textContent = collapsed ? '▾' : '◂';
+}
+
+function addExerciseByName(name) {
+  const wo = getWorkout(currentDate);
+  if (wo.exercises.find(e => e.name === name)) {
+    showToast(`${name}はすでに追加済みです`);
+    return;
+  }
+  wo.exercises.push({ name, sets: [{ weight: '', reps: '' }] });
+  saveWorkout(currentDate, wo);
+  loadLogPage();
+  showToast(`${name}を追加しました`);
+}
+
+function addExercise() {
+  const input = document.getElementById('newExName');
+  const name = input.value.trim();
+  if (!name) { showToast('種目名を入力してください'); return; }
+  addExerciseByName(name);
+  input.value = '';
+}
+
+function startEditName(ei) {
+  const cards = document.querySelectorAll('.exercise-card');
+  const card = cards[ei];
+  if (!card) return;
+  const nameSpan = card.querySelector('.ex-name');
+  if (!nameSpan) return;
+  const oldName = nameSpan.textContent;
+
+  const input = document.createElement('input');
+  input.type = 'text';
+  input.className = 'ex-name-input';
+  input.value = oldName;
+  nameSpan.replaceWith(input);
+  input.focus();
+  input.select();
+
+  const commit = () => {
+    const newName = input.value.trim() || oldName;
+    if (newName !== oldName) {
+      const wo = getWorkout(currentDate);
+      wo.exercises[ei].name = newName;
+      saveWorkout(currentDate, wo);
+    }
+    const span = document.createElement('span');
+    span.className = 'ex-name';
+    span.textContent = newName;
+    input.replaceWith(span);
+    renderSummary();
+  };
+  input.addEventListener('blur', commit);
+  input.addEventListener('keydown', e => {
+    if (e.key === 'Enter') { e.preventDefault(); input.blur(); }
+    if (e.key === 'Escape') { input.value = oldName; input.blur(); }
+  });
+}
+
+function deleteExercise(ei) {
+  const wo = getWorkout(currentDate);
+  wo.exercises.splice(ei, 1);
+  saveWorkout(currentDate, wo);
+  loadLogPage();
+}
+
+function addSet(ei) {
+  const wo = getWorkout(currentDate);
+  const prev = wo.exercises[ei].sets;
+  const last = prev.length ? prev[prev.length - 1] : {};
+  wo.exercises[ei].sets.push({ weight: last.weight || '', reps: last.reps || '' });
+  saveWorkout(currentDate, wo);
+  loadLogPage();
+}
+
+function deleteSet(ei, si) {
+  const wo = getWorkout(currentDate);
+  wo.exercises[ei].sets.splice(si, 1);
+  saveWorkout(currentDate, wo);
+  loadLogPage();
+}
+
+function updateSet(ei, si, field, val) {
+  const wo = getWorkout(currentDate);
+  wo.exercises[ei].sets[si][field] = val;
+  saveWorkout(currentDate, wo);
+  renderSummary();
+  // refresh badges only (don't re-render all to avoid losing focus)
+  const exCards = document.querySelectorAll('.exercise-card');
+  if (exCards[ei]) {
+    const ex = wo.exercises[ei];
+    const curMax = Math.max(0, ...ex.sets.map(s => parseFloat(s.weight) || 0));
+    const prevBest = getPRBeforeDate(ex.name, currentDate);
+    const globalPR = getPR(ex.name);
+    const isPR = curMax > 0 && curMax >= globalPR && curMax > prevBest;
+    const isUp = curMax > 0 && prevBest > 0 && curMax > prevBest && !isPR;
+    const header = exCards[ei].querySelector('.exercise-header');
+    const oldBadge = header.querySelector('.badge');
+    if (oldBadge) oldBadge.remove();
+    if (isPR || isUp) {
+      const diff = prevBest > 0 ? ((curMax - prevBest) / prevBest * 100).toFixed(1) : null;
+      const badge = document.createElement('span');
+      badge.className = `badge ${isPR ? 'badge-pr' : 'badge-up'}`;
+      badge.innerHTML = isPR ? `${TROPHY_SVG} 自己ベスト更新!` : `↑${diff !== null ? ' ' + diff + '%' : ''}`;
+      header.insertBefore(badge, header.querySelector('button'));
+    }
+  }
+}
+
+function renderSummary() {
+  const wo = getWorkout(currentDate);
+  let volume = 0, sets = 0, prs = 0;
+  wo.exercises.forEach(ex => {
+    const prevBest = getPRBeforeDate(ex.name, currentDate);
+    const curMax = Math.max(0, ...ex.sets.map(s => parseFloat(s.weight) || 0));
+    if (curMax > prevBest && curMax > 0) prs++;
+    ex.sets.forEach(s => {
+      const w = parseFloat(s.weight) || 0;
+      const r = parseInt(s.reps) || 0;
+      if (w > 0 && r > 0) { volume += w * r; sets++; }
+    });
+  });
+  document.getElementById('sumVolume').textContent = volume.toLocaleString();
+  document.getElementById('sumSets').textContent = sets;
+  document.getElementById('sumPR').textContent = prs;
+}
+
+// ===== STREAK =====
+// 2日付文字列間の日数差を返す（タイムゾーン安全）
+function daysBetweenStr(a, b) {
+  const [ay, am, ad] = a.split('-').map(Number);
+  const [by, bm, bd] = b.split('-').map(Number);
+  return Math.round((Date.UTC(ay, am-1, ad) - Date.UTC(by, bm-1, bd)) / 86400000);
+}
+
+function updateStreak() {
+  const el = document.getElementById('streakDisplay');
+  const freqEl = document.getElementById('freqDisplay');
+  const s = loadSettings();
+  const freq = s.gymFrequency || 0; // 0 = 未設定
+  // 許容ギャップ: 設定あり→freq+1日まで、未設定→3日まで
+  const maxGap = freq > 0 ? freq + 1 : 3;
+
+  // 頻度バッジ表示
+  if (freq > 0 && freqEl) {
+    freqEl.textContent = `${freq}日に1回`;
+    freqEl.style.display = 'block';
+  } else if (freqEl) {
+    freqEl.style.display = 'none';
+  }
+
+  const dates = getAllDatesWithWorkout().sort().reverse();
+  if (!dates.length) { el.innerHTML = '0回継続'; return; }
+
+  const today = todayStr();
+  const sinceLastWorkout = daysBetweenStr(today, dates[0]);
+  if (sinceLastWorkout > maxGap) { el.innerHTML = '0回継続'; return; }
+
+  let streak = 1;
+  for (let i = 0; i < dates.length - 1; i++) {
+    const gap = daysBetweenStr(dates[i], dates[i + 1]);
+    if (gap >= 1 && gap <= maxGap) {
+      streak++;
+    } else {
+      break;
+    }
+  }
+  el.innerHTML = `${streak}回継続中`;
+}
+
+// ===== PROGRESS PAGE =====
+function renderProgressExSelect() {
+  const sel = document.getElementById('progressEx');
+  const current = sel.value;
+  const names = getAllExerciseNames();
+  sel.innerHTML = '<option value="">種目を選択</option>' +
+    '<option value="__bodyweight__">体重の変化</option>' +
+    names.map(n => `<option value="${n}" ${n === current ? 'selected' : ''}>${n}</option>`).join('');
+  if (current) sel.value = current;
+}
+
+function renderProgress() {
+  const exName = document.getElementById('progressEx').value;
+  const range = document.getElementById('progressRange').value;
+  const container = document.getElementById('progressContent');
+
+  if (exName === '__bodyweight__') {
+    if (chartInstance) { chartInstance.destroy(); chartInstance = null; }
+    renderBodyWeightProgress(range, container);
+    return;
+  }
+
+  if (!exName) {
+    const names = getAllExerciseNames();
+    if (!names.length) {
+      container.innerHTML = `<div class="empty-state"><div class="ei">📈</div><p>まだ記録がありません。<br>まず「記録」タブでトレーニングを追加してください。</p></div>`;
+      return;
+    }
+    container.innerHTML = names.map(name => {
+      const pr = getPR(name);
+      const dates = getAllDatesWithWorkout();
+      const count = dates.filter(d => getWorkout(d).exercises.find(e => e.name === name)).length;
+      return `
+        <div class="history-entry" onclick="selectProgressEx('${name}')">
+          <div class="he-exercises">
+            <div class="he-ex-row">
+              <span class="he-name">${name}</span>
+              <span class="he-best">${count}回記録 | ベスト ${pr}kg</span>
+            </div>
+          </div>
+        </div>`;
+    }).join('');
+    return;
+  }
+
+  const db = loadDB();
+  const cutoff = range === 'all' ? null : localDateStr(new Date(new Date().setDate(new Date().getDate() - parseInt(range))));
+  const points = [];
+  for (const date in db) {
+    if (cutoff && date < cutoff) continue;
+    const wo = db[date];
+    if (!wo.exercises) continue;
+    const ex = wo.exercises.find(e => e.name === exName);
+    if (!ex) continue;
+    const maxW = Math.max(...ex.sets.map(s => parseFloat(s.weight) || 0));
+    const vol = ex.sets.reduce((sum, s) => sum + (parseFloat(s.weight)||0)*(parseInt(s.reps)||0), 0);
+    if (maxW > 0) points.push({ date, maxW, vol });
+  }
+  points.sort((a, b) => a.date.localeCompare(b.date));
+
+  if (!points.length) {
+    container.innerHTML = `<div class="empty-state"><div class="ei">🔍</div><p>この期間の記録がありません。</p></div>`;
+    return;
+  }
+
+  const pr = Math.max(...points.map(p => p.maxW));
+  const latest = points[points.length - 1];
+  const prev = points.length > 1 ? points[points.length - 2] : null;
+  const diff = prev ? (latest.maxW - prev.maxW).toFixed(1) : null;
+
+  let bannerHTML = '';
+  if (latest.maxW >= pr) {
+    bannerHTML = `<div class="pr-banner"><span class="pr-icon">${TROPHY_SVG_MD}</span><div>最高記録: <strong>${pr}kg</strong>${diff > 0 ? ` (前回比 <strong>+${diff}kg</strong>)` : ''}</div></div>`;
+  } else {
+    bannerHTML = `<div class="pr-banner" style="border-color:rgba(108,99,255,0.3);background:rgba(108,99,255,0.08)"><span class="pr-icon">📊</span><div>最高記録: <strong style="color:var(--accent)">${pr}kg</strong> | 直近: <strong style="color:var(--text)">${latest.maxW}kg</strong></div></div>`;
+  }
+
+  container.innerHTML = `
+    ${bannerHTML}
+    <div class="chart-card">
+      <h3>${exName}</h3>
+      <div class="chart-sub">最大重量の推移 (${points.length}回のトレーニング)</div>
+      <canvas id="weightChart" height="200"></canvas>
+    </div>
+    <div class="chart-card">
+      <h3>総ボリューム推移</h3>
+      <div class="chart-sub">重量 × 回数の合計</div>
+      <canvas id="volChart" height="160"></canvas>
+    </div>`;
+
+  if (chartInstance) { chartInstance.destroy(); chartInstance = null; }
+
+  const labels = points.map(p => {
+    const d = new Date(p.date + 'T00:00:00');
+    return `${d.getMonth()+1}/${d.getDate()}`;
+  });
+
+  const dataMin = Math.min(...points.map(p => p.maxW));
+  const dataMax = Math.max(...points.map(p => p.maxW));
+  const padding = Math.max(dataMax * 0.25, 15);
+  const yMin = Math.max(0, Math.floor((dataMin - padding) / 2.5) * 2.5);
+  const yMax = Math.ceil((dataMax + padding) / 2.5) * 2.5;
+
+  const weightCtx = document.getElementById('weightChart').getContext('2d');
+  chartInstance = new Chart(weightCtx, {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [{
+        label: '最大重量 (kg)',
+        data: points.map(p => p.maxW),
+        borderColor: '#6c63ff',
+        backgroundColor: 'rgba(108,99,255,0.1)',
+        borderWidth: 2.5,
+        pointRadius: 5,
+        pointBackgroundColor: points.map(p => p.maxW >= pr ? '#ffd700' : '#6c63ff'),
+        pointBorderColor: points.map(p => p.maxW >= pr ? '#ffd700' : '#6c63ff'),
+        tension: 0.3,
+        fill: true,
+      }]
+    },
+    options: {
+      responsive: true,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: ctx => `${ctx.parsed.y}kg${points[ctx.dataIndex].maxW >= pr ? ' ★ベスト' : ''}`
+          }
+        }
+      },
+      scales: {
+        x: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#6b6b8a' } },
+        y: { min: yMin, max: yMax, grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#6b6b8a', stepSize: 2.5, callback: v => v + 'kg' } }
+      }
+    }
+  });
+
+  const volCtx = document.getElementById('volChart').getContext('2d');
+  new Chart(volCtx, {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [{
+        label: 'ボリューム',
+        data: points.map(p => p.vol),
+        backgroundColor: 'rgba(168,85,247,0.5)',
+        borderColor: 'rgba(168,85,247,0.8)',
+        borderWidth: 1,
+        borderRadius: 4,
+      }]
+    },
+    options: {
+      responsive: true,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#6b6b8a' } },
+        y: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#6b6b8a', callback: v => v + 'kg' } }
+      }
+    }
+  });
+}
+
+function selectProgressEx(name) {
+  document.getElementById('progressEx').value = name;
+  renderProgress();
+}
+
+// ===== HISTORY / CALENDAR =====
+function initCal() {
+  const now = new Date();
+  calYear = now.getFullYear();
+  calMonth = now.getMonth();
+}
+
+function changeCalMonth(delta) {
+  calMonth += delta;
+  if (calMonth < 0) { calMonth = 11; calYear--; }
+  if (calMonth > 11) { calMonth = 0; calYear++; }
+  renderCalendar();
+}
+
+function renderCalendar() {
+  const workoutDates = new Set(getAllDatesWithWorkout());
+  const today = todayStr();
+
+  document.getElementById('calTitle').textContent = `${calYear}年${calMonth+1}月`;
+
+  const first = new Date(calYear, calMonth, 1);
+  const last = new Date(calYear, calMonth + 1, 0);
+  const startDay = (first.getDay() + 6) % 7; // Mon start
+
+  const grid = document.getElementById('calGrid');
+  const dayNames = ['月','火','水','木','金','土','日'];
+  let html = dayNames.map(d => `<div class="cal-day-name">${d}</div>`).join('');
+
+  for (let i = 0; i < startDay; i++) html += `<div class="cal-day empty"></div>`;
+
+  for (let d = 1; d <= last.getDate(); d++) {
+    const dateStr = `${calYear}-${String(calMonth+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    const hasW = workoutDates.has(dateStr);
+    const isToday = dateStr === today;
+    html += `<div class="cal-day ${hasW ? 'has-workout' : ''} ${isToday ? 'today' : ''}"
+      onclick="selectCalDay('${dateStr}')">${d}${hasW ? '<span class="cal-dot"></span>' : ''}</div>`;
+  }
+  grid.innerHTML = html;
+}
+
+function selectCalDay(dateStr) {
+  document.querySelectorAll('.cal-day').forEach(d => d.classList.remove('selected'));
+  event.currentTarget.classList.add('selected');
+  renderHistoryDetail(dateStr);
+}
+
+function renderHistoryDetail(filterDate) {
+  const db = loadDB();
+  let dates = Object.keys(db).filter(d => {
+    const wo = db[d];
+    return wo.exercises && wo.exercises.some(e => e.sets && e.sets.some(s => s.weight));
+  }).sort((a, b) => b.localeCompare(a));
+
+  if (filterDate) dates = [filterDate];
+
+  const titleEl = document.getElementById('historyDetailTitle');
+  titleEl.textContent = filterDate ? formatDate(filterDate) + 'の記録' : '記録一覧 (最新順)';
+
+  const container = document.getElementById('historyDetail');
+  if (!dates.length || (filterDate && !db[filterDate])) {
+    container.innerHTML = `<div class="empty-state"><div class="ei">📭</div><p>${filterDate ? 'この日の記録はありません。' : 'まだ記録がありません。'}</p></div>`;
+    return;
+  }
+
+  container.innerHTML = dates.map(date => {
+    const wo = db[date];
+    if (!wo.exercises) return '';
+    const exRows = wo.exercises.map(ex => {
+      const maxW = Math.max(0, ...ex.sets.map(s => parseFloat(s.weight) || 0));
+      const totalSets = ex.sets.filter(s => s.weight).length;
+      const vol = ex.sets.reduce((sum, s) => sum + (parseFloat(s.weight)||0)*(parseInt(s.reps)||0), 0);
+      return `<div class="he-ex-row">
+        <span class="he-name">${ex.name}</span>
+        <span class="he-best">${totalSets}セット | 最大${maxW}kg | ${vol}kg</span>
+      </div>`;
+    }).join('');
+
+    return `<div class="history-entry" onclick="jumpToDate('${date}')">
+      <div class="he-date">${formatDate(date)}</div>
+      <div class="he-exercises">${exRows}</div>
+    </div>`;
+  }).join('');
+}
+
+function jumpToDate(dateStr) {
+  currentDate = dateStr;
+  document.getElementById('logDate').value = dateStr;
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('nav button').forEach(b => b.classList.remove('active'));
+  document.getElementById('page-log').classList.add('active');
+  document.querySelector('nav button:first-child').classList.add('active');
+  loadLogPage();
+}
+
+// ===== TOAST =====
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2000);
+}
+
+// ===== INIT =====
+function init() {
+  const today = todayStr();
+  document.getElementById('logDate').value = today;
+  currentDate = today;
+  initCal();
+  loadLogPage();
+  updateProfileDisplay();
+}
+
+init();
+</script>
+</body>
+</html>
