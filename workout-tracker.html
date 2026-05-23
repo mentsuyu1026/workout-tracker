@@ -789,14 +789,35 @@
 // ===== GOOGLE OAUTH =====
 const GOOGLE_CLIENT_ID = '735269920297-cbtd7o6ifes129a45i5k18cllb9plpmc.apps.googleusercontent.com';
 
-// ===== SETTINGS =====
-const SETTINGS_KEY = 'workoutSettings_v1';
+// ===== MULTI-USER STORAGE =====
+const DB_KEY_BASE       = 'workoutDB_v2';
+const SETTINGS_KEY_BASE = 'workoutSettings_v1';
 
+function getCurrentUserId() {
+  try {
+    const raw = localStorage.getItem('workoutGoogleUser_v1');
+    if (!raw) return 'guest';
+    const u = JSON.parse(raw);
+    return (u && u.sub) ? `google_${u.sub}` : 'guest';
+  } catch { return 'guest'; }
+}
+function getDbKey()       { return `${DB_KEY_BASE}_${getCurrentUserId()}`; }
+function getSettingsKey() { return `${SETTINGS_KEY_BASE}_${getCurrentUserId()}`; }
+
+// 旧データ（キーなし）を現在のユーザーキーへ自動移行
+function migrateOldData() {
+  const oldDb  = localStorage.getItem(DB_KEY_BASE);
+  const oldSet = localStorage.getItem(SETTINGS_KEY_BASE);
+  if (oldDb  && !localStorage.getItem(getDbKey()))       { localStorage.setItem(getDbKey(), oldDb);        localStorage.removeItem(DB_KEY_BASE); }
+  if (oldSet && !localStorage.getItem(getSettingsKey())) { localStorage.setItem(getSettingsKey(), oldSet); localStorage.removeItem(SETTINGS_KEY_BASE); }
+}
+
+// ===== SETTINGS =====
 function loadSettings() {
-  try { return JSON.parse(localStorage.getItem(SETTINGS_KEY)) || {}; }
+  try { return JSON.parse(localStorage.getItem(getSettingsKey())) || {}; }
   catch { return {}; }
 }
-function saveSettings(s) { localStorage.setItem(SETTINGS_KEY, JSON.stringify(s)); }
+function saveSettings(s) { localStorage.setItem(getSettingsKey(), JSON.stringify(s)); }
 
 function openSettings() {
   const s = loadSettings();
@@ -867,26 +888,21 @@ function decodeJwtPayload(token) {
 function handleGoogleCredential(response) {
   const payload = decodeJwtPayload(response.credential);
   if (!payload) { showToast('サインインに失敗しました'); return; }
-  saveGoogleUser({ name: payload.name, email: payload.email, picture: payload.picture });
+  // sub を含めて保存 → これ以降 getCurrentUserId() がこのユーザーのキーを返す
+  saveGoogleUser({ name: payload.name, email: payload.email, picture: payload.picture, sub: payload.sub });
+  // このユーザーの設定を読み込み、名前が未設定なら Google 名を初期値にする
   const s = loadSettings();
-  s.name = payload.name;
-  saveSettings(s);
-  const nameInput = document.getElementById('settingName');
-  if (nameInput) nameInput.value = payload.name;
-  updateProfileDisplay();
+  if (!s.name) { s.name = payload.name; saveSettings(s); }
+  reloadAllData();
   updateGoogleSection();
   showToast('Googleアカウントでサインインしました');
 }
 
 function signOutGoogle() {
   const user = loadGoogleUser();
+  // Google ユーザーをクリア → 以降 getCurrentUserId() は 'guest' を返す
   saveGoogleUser(null);
-  const s = loadSettings();
-  s.name = '';
-  saveSettings(s);
-  const nameInput = document.getElementById('settingName');
-  if (nameInput) nameInput.value = '';
-  updateProfileDisplay();
+  reloadAllData();
   updateGoogleSection();
   if (window.google && google.accounts && google.accounts.id) {
     google.accounts.id.disableAutoSelect();
@@ -927,14 +943,12 @@ function updateGoogleSection() {
 }
 
 // ===== DATA LAYER =====
-const DB_KEY = 'workoutDB_v2';
-
 function loadDB() {
-  try { return JSON.parse(localStorage.getItem(DB_KEY)) || {}; }
+  try { return JSON.parse(localStorage.getItem(getDbKey())) || {}; }
   catch { return {}; }
 }
 function saveDB(db) {
-  localStorage.setItem(DB_KEY, JSON.stringify(db));
+  localStorage.setItem(getDbKey(), JSON.stringify(db));
 }
 
 function getWorkout(dateStr) {
@@ -1689,8 +1703,19 @@ function showToast(msg) {
   setTimeout(() => t.classList.remove('show'), 2000);
 }
 
+// ===== RELOAD (ユーザー切り替え時に全UIを更新) =====
+function reloadAllData() {
+  updateProfileDisplay();
+  updateStreak();
+  initCal();
+  loadLogPage();
+  const nameInput = document.getElementById('settingName');
+  if (nameInput) { const s = loadSettings(); nameInput.value = s.name || ''; }
+}
+
 // ===== INIT =====
 function init() {
+  migrateOldData(); // 旧フォーマットのデータを現在のユーザーキーへ移行
   const today = todayStr();
   document.getElementById('logDate').value = today;
   currentDate = today;
