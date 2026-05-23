@@ -798,18 +798,37 @@ function getCurrentUserId() {
     const raw = localStorage.getItem('workoutGoogleUser_v1');
     if (!raw) return 'guest';
     const u = JSON.parse(raw);
-    return (u && u.sub) ? `google_${u.sub}` : 'guest';
+    if (!u) return 'guest';
+    if (u.sub)   return `google_${u.sub}`;
+    if (u.email) return `google_${u.email.replace(/[@.]/g, '_')}`; // sub未保存の旧ユーザー向けフォールバック
+    return 'guest';
   } catch { return 'guest'; }
 }
 function getDbKey()       { return `${DB_KEY_BASE}_${getCurrentUserId()}`; }
 function getSettingsKey() { return `${SETTINGS_KEY_BASE}_${getCurrentUserId()}`; }
 
-// 旧データ（キーなし）を現在のユーザーキーへ自動移行
+// データキーを移行するユーティリティ
+function _migrateKey(fromDbKey, fromSetKey, toDbKey, toSetKey) {
+  if (!localStorage.getItem(toDbKey)  && localStorage.getItem(fromDbKey))  { localStorage.setItem(toDbKey,  localStorage.getItem(fromDbKey));  localStorage.removeItem(fromDbKey); }
+  if (!localStorage.getItem(toSetKey) && localStorage.getItem(fromSetKey)) { localStorage.setItem(toSetKey, localStorage.getItem(fromSetKey)); localStorage.removeItem(fromSetKey); }
+}
+
+// 旧データを現在のユーザーキーへ自動移行
 function migrateOldData() {
-  const oldDb  = localStorage.getItem(DB_KEY_BASE);
-  const oldSet = localStorage.getItem(SETTINGS_KEY_BASE);
-  if (oldDb  && !localStorage.getItem(getDbKey()))       { localStorage.setItem(getDbKey(), oldDb);        localStorage.removeItem(DB_KEY_BASE); }
-  if (oldSet && !localStorage.getItem(getSettingsKey())) { localStorage.setItem(getSettingsKey(), oldSet); localStorage.removeItem(SETTINGS_KEY_BASE); }
+  // ① キーなし旧データ → 現在のユーザーキー
+  _migrateKey(DB_KEY_BASE, SETTINGS_KEY_BASE, getDbKey(), getSettingsKey());
+
+  // ② sub なし Google ユーザー: guest キーに入ったデータ → email キーへ移行
+  try {
+    const u = JSON.parse(localStorage.getItem('workoutGoogleUser_v1') || 'null');
+    if (u && !u.sub && u.email) {
+      const emailId  = `google_${u.email.replace(/[@.]/g, '_')}`;
+      _migrateKey(
+        `${DB_KEY_BASE}_guest`,       `${SETTINGS_KEY_BASE}_guest`,
+        `${DB_KEY_BASE}_${emailId}`,  `${SETTINGS_KEY_BASE}_${emailId}`
+      );
+    }
+  } catch {}
 }
 
 // ===== SETTINGS =====
@@ -890,6 +909,10 @@ function handleGoogleCredential(response) {
   if (!payload) { showToast('サインインに失敗しました'); return; }
   // sub を含めて保存 → これ以降 getCurrentUserId() がこのユーザーのキーを返す
   saveGoogleUser({ name: payload.name, email: payload.email, picture: payload.picture, sub: payload.sub });
+  // 旧キー（emailベース or guest）から subキーへデータ移行
+  const emailId = `google_${payload.email.replace(/[@.]/g, '_')}`;
+  _migrateKey(`${DB_KEY_BASE}_${emailId}`,  `${SETTINGS_KEY_BASE}_${emailId}`,  getDbKey(), getSettingsKey());
+  _migrateKey(`${DB_KEY_BASE}_guest`,        `${SETTINGS_KEY_BASE}_guest`,        getDbKey(), getSettingsKey());
   // このユーザーの設定を読み込み、名前が未設定なら Google 名を初期値にする
   const s = loadSettings();
   if (!s.name) { s.name = payload.name; saveSettings(s); }
