@@ -873,6 +873,11 @@ function handleGoogleCredential(response) {
   const payload = decodeJwtPayload(response.credential);
   if (!payload) { showToast('サインインに失敗しました'); return; }
   saveGoogleUser({ name: payload.name, email: payload.email, picture: payload.picture });
+  const s = loadSettings();
+  s.name = payload.name;
+  saveSettings(s);
+  const nameInput = document.getElementById('settingName');
+  if (nameInput) nameInput.value = payload.name;
   updateProfileDisplay();
   updateGoogleSection();
   showToast('Googleアカウントでサインインしました');
